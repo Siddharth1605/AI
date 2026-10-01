@@ -2,7 +2,7 @@
 > Query: "serviceA scale"
 Relevant chunk: "serviceA scalability" → rank 4
 Irrelevant chunks: "serviceA initialization", "service configuration" → ranks 1–3
-
+kamm
 
 This is a perfect reason to learn hybrid retrieval rather than blindly increasing top_k.
 
