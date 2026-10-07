@@ -1,5 +1,5 @@
 Yep. Since you already have DOCX → chunks → Ollama embeddings → ChromaDB → vector retrieval, don't restart anything.
-
+ 
 Your next goal is very specific:
 
 > Take the same document and make retrieval better by combining vector search + BM25, then measure whether the hybrid system actually improves your serviceA scale → serviceA scalability case.
