@@ -2,8 +2,6 @@
 > Query: "serviceA scale"
 Relevant chunk: "serviceA scalability" → rank 4
 Irrelevant chunks: "serviceA initialization", "service configuration" → ranks 1–3
-kamm
-
 This is a perfect reason to learn hybrid retrieval rather than blindly increasing top_k.
 
 I’ll structure this as a mini implementation document, starting from why BM25 exists and ending with a Python implementation you can plug into your current Ollama + Chroma demo.
