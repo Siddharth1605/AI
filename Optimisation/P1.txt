@@ -1,0 +1,26 @@
+RETRIEVAL TIMING
+================
+question_analysis: 0.000s
+build_search_text: 0.000s
+vector_search_and_embedding: 0.633s
+bm25_search: 0.004s
+rank_fusion: 0.000s
+metadata_ranking: 0.006s
+llm_reranking: 0.000s
+total_retrieval: 0.643s
+retrieval wall-clock: 0.643s
+context chunks: 3
+Prompt size: 5,895 characters | retrieved context: 4,988 characters
+
+
+ANSWER GENERATION TIMING
+========================
+Ollama total: 37.814s
+Model load: 4.225s
+Prompt processing: 21.895s
+Token generation: 11.675s
+Prompt tokens: 1314
+Generated tokens: 123
+
+Answer wall-clock: 37.818s
+Total question time: 38.462s
