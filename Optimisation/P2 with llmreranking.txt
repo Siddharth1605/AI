@@ -1,0 +1,28 @@
+RETRIEVAL TIMING
+================
+question_analysis: 0.000s
+build_search_text: 0.000s
+vector_search_and_embedding: 0.138s
+bm25_search: 0.007s
+rank_fusion: 0.000s
+metadata_ranking: 0.009s
+llm_reranking: 55.273s
+total_retrieval: 55.428s
+retrieval wall-clock: 55.428s
+context chunks: 4
+Prompt size: 7,224 characters | retrieved context: 6,317 characters
+
+ANSWER GENERATION TIMING
+========================
+Ollama total: 44.375s
+Model load: 0.018s
+Prompt processing: 31.175s
+Token generation: 12.902s
+Prompt tokens: 1650
+Generated tokens: 132
+
+Answer wall-clock: 44.377s
+Total question time: 99.806s
+
+
+Accuracy has been increased but with some wrong answers
