@@ -2,27 +2,24 @@ RETRIEVAL TIMING
 ================
 question_analysis: 0.000s
 build_search_text: 0.000s
-vector_search_and_embedding: 0.138s
-bm25_search: 0.007s
+vector_search_and_embedding: 0.587s
+bm25_search: 0.001s
 rank_fusion: 0.000s
-metadata_ranking: 0.009s
-llm_reranking: 55.273s
-total_retrieval: 55.428s
-retrieval wall-clock: 55.428s
+metadata_ranking: 0.003s
+llm_reranking: 90.653s
+total_retrieval: 91.244s
+retrieval wall-clock: 91.244s
 context chunks: 4
-Prompt size: 7,224 characters | retrieved context: 6,317 characters
+Prompt size: 7,249 characters | retrieved context: 6,465 characters
 
 ANSWER GENERATION TIMING
 ========================
-Ollama total: 44.375s
-Model load: 0.018s
-Prompt processing: 31.175s
-Token generation: 12.902s
-Prompt tokens: 1650
-Generated tokens: 132
+Ollama total: 51.479s
+Model load: 0.014s
+Prompt processing: 29.609s
+Token generation: 21.686s
+Prompt tokens: 1880
+Generated tokens: 213
 
-Answer wall-clock: 44.377s
-Total question time: 99.806s
-
-
-Accuracy has been increased but with some wrong answers
+Answer wall-clock: 51.482s
+Total question time: 142.726s
