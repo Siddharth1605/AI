@@ -5,28 +5,28 @@ from pathlib import Path
 
 import requests
 from docx import Document
-from pypdf import PdfReader
 
 MODEL = "gemma3"
 OLLAMA_URL = "http://localhost:11434/api/chat"
 
 
 def read_srs(file_path):
-    path = Path(file_path)
-    suffix = path.suffix.lower()
+    """Extract paragraphs AND tables from a DOCX."""
+    doc = Document(file_path)
+    sections = []
 
-    if suffix == ".pdf":
-        reader = PdfReader(str(path))
-        return "\n".join(page.extract_text() or "" for page in reader.pages)
+    for paragraph in doc.paragraphs:
+        text = paragraph.text.strip()
+        if text:
+            sections.append(text)
 
-    if suffix == ".docx":
-        doc = Document(str(path))
-        return "\n".join(p.text for p in doc.paragraphs)
+    for table_index, table in enumerate(doc.tables, start=1):
+        sections.append(f"\n[TABLE {table_index}]")
+        for row in table.rows:
+            cells = [cell.text.strip().replace("\n", " ") for cell in row.cells]
+            sections.append(" | ".join(cells))
 
-    if suffix in {".txt", ".md"}:
-        return path.read_text(encoding="utf-8")
-
-    raise ValueError("Supported formats: PDF, DOCX, TXT, MD")
+    return "\n".join(sections)
 
 
 def ask_model(system_prompt, user_prompt):
@@ -44,99 +44,147 @@ def ask_model(system_prompt, user_prompt):
         timeout=300,
     )
     response.raise_for_status()
+
     content = response.json()["message"]["content"]
-    return json.loads(content)
+    print("\nModel response preview:", content[:800])
+
+    result = json.loads(content)
+
+    if not isinstance(result, dict):
+        raise ValueError("Model returned JSON, but not a JSON object.")
+
+    return result
 
 
 def generate_test_cases(srs_text):
-    system_prompt = """
-You are a software developer test-case generation agent.
+    prompt = """
+You are a software QA engineer generating developer test cases.
 
-Use ONLY the requirements stated in the supplied SRS.
-Do not invent product behavior or assume missing business rules.
+Read the supplied Software Requirements Specification (SRS).
 
-Identify functional requirements and generate developer-level test cases:
-- Happy paths
-- Negative cases
-- Boundary conditions
-- Input validation
-- Error handling
-- State transitions, if specified
-
-For every test case include:
-- id
-- requirement_reference (use the SRS ID if present)
-- scenario
-- preconditions
-- test_steps (an array)
-- test_data
-- expected_result
-- test_type
-
-If behavior is unspecified, list it under open_questions.
-Do not claim a requirement is covered unless a test maps to it.
-
-Return JSON with this exact structure:
+Return a JSON object with this structure:
 {
-  "test_cases": [],
+  "test_cases": [
+    {
+      "id": "TC-001",
+      "requirement_reference": "requirement ID or Not specified",
+      "scenario": "What is being tested",
+      "preconditions": "Required setup",
+      "test_steps": ["Step 1", "Step 2"],
+      "test_data": "Input data",
+      "expected_result": "Expected behavior",
+      "test_type": "positive, negative, boundary, or error handling"
+    }
+  ],
   "open_questions": [],
   "requirements_needing_clarification": []
 }
+
+Rules:
+- Generate test cases for the actual requirements in the SRS.
+- Include positive, negative, and boundary tests when applicable.
+- Use requirement IDs when present.
+- Never invent unspecified business rules.
+- Put unclear behavior in open_questions.
+- Do not return an empty test_cases array if the SRS
+  contains testable requirements.
+- Return valid JSON only.
 """
 
     result = ask_model(
-        system_prompt,
-        "Analyze this SRS and generate developer test cases:\n\n" + srs_text,
+        prompt,
+        "Generate developer test cases from this SRS:\n\n" + srs_text,
     )
 
-    # Second pass: review the generated tests against the source.
-    review_prompt = """
-Review the proposed developer test cases against the original SRS.
+    cases = result.get("test_cases", [])
 
-Check for:
-1. Unsupported assumptions or invented behavior.
-2. Missing negative or boundary cases where requirements justify them.
-3. Missing requirement references.
-4. Duplicate or vague tests.
-5. Expected results that are not supported by the SRS.
+    # Retry once if the first response has no usable test cases.
+    if not isinstance(cases, list) or not cases:
+        print("\nNo test cases generated. Retrying with a simpler prompt...")
 
-Correct the test cases and preserve the JSON schema:
-test_cases, open_questions, requirements_needing_clarification.
-Return JSON only.
+        retry_prompt = """
+Create developer test cases for the requirements below.
+Return JSON with a test_cases array.
+Each test case must have id, scenario, test_steps,
+expected_result, and test_type.
+Do not invent unspecified behavior.
+Return at least one case per identifiable, testable requirement.
 """
 
-    reviewed = ask_model(
-        review_prompt,
-        "ORIGINAL SRS:\n"
-        + srs_text
-        + "\n\nPROPOSED TEST CASES:\n"
-        + json.dumps(result, ensure_ascii=False),
-    )
+        result = ask_model(retry_prompt, srs_text)
+        cases = result.get("test_cases", [])
 
-    return reviewed
+    if not isinstance(cases, list) or not cases:
+        raise RuntimeError(
+            "The model generated zero test cases after retry. "
+            "Check the extracted SRS and model response above."
+        )
+
+    # Review is optional. Never allow a failed review to erase valid cases.
+    print(f"\nGenerated {len(cases)} test cases. Reviewing...")
+
+    try:
+        reviewed = ask_model(
+            """
+Review these test cases against the original SRS.
+Remove unsupported assumptions and duplicates.
+Preserve valid test cases and their expected results.
+Do not return an empty test_cases array if valid cases exist.
+Return JSON with test_cases, open_questions, and
+requirements_needing_clarification.
+""",
+            "SRS:\n" + srs_text
+            + "\n\nGenerated test cases:\n"
+            + json.dumps(result, ensure_ascii=False),
+        )
+
+        reviewed_cases = reviewed.get("test_cases", [])
+
+        if isinstance(reviewed_cases, list) and reviewed_cases:
+            result = reviewed
+        else:
+            print("Review returned no cases. Keeping original results.")
+
+    except (requests.RequestException, ValueError, KeyError) as exc:
+        print(f"Review failed; keeping original results: {exc}")
+
+    return result
 
 
 def main():
     if len(sys.argv) != 2:
-        print("Usage: python srs_test_agent.py path/to/requirements.pdf")
+        print("Usage: python srs_test_agent.py requirements.docx")
         return
 
     file_path = Path(sys.argv[1])
-    srs_text = read_srs(file_path)
+
+    if not file_path.is_file():
+        raise FileNotFoundError(f"SRS file not found: {file_path}")
+
+    srs_text = read_srs(str(file_path))
+
+    print("Extracted SRS characters:", len(srs_text))
+    print("Extracted SRS preview:\n", srs_text[:1000])
 
     if not srs_text.strip():
-        raise ValueError("No readable text found in the SRS.")
+        raise ValueError(
+            "No text extracted. Check whether the DOCX contains "
+            "images/scanned pages or content inside text boxes."
+        )
 
-    print("Generating and reviewing test cases...")
     result = generate_test_cases(srs_text)
 
-    output_path = file_path.with_name(file_path.stem + "_test_cases.json")
+    output_path = file_path.with_name(
+        file_path.stem + "_test_cases.json"
+    )
+
     output_path.write_text(
         json.dumps(result, indent=2, ensure_ascii=False),
         encoding="utf-8",
     )
 
-    print(f"Done! Output saved to: {output_path}")
+    print(f"\nSaved: {output_path.resolve()}")
+    print("Final test case count:", len(result["test_cases"]))
 
 
 if __name__ == "__main__":
